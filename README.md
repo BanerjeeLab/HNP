@@ -35,17 +35,6 @@ Run the simulation. On Windows double clicking the "wound_healing.fe" file shoul
 
 During running, the simulation records statistics, such as the occurence of intercalations, the gap shape, and cell shapes. Once the simulation has completed, the following output files will have been created, where %s is the "output_name" variable:
 
-* "output/%s_tissue_energy.csv" is a table with the following columns: simulation step, cell id, initial wound distance, current wound distance, cell energy.
-
-* "output/%s_unwounded_t1s.csv" and "output/%s_wounded_t1s.csv" are tables recording occurences of T1s before and after wounding. "T1 Count" indicates the number of T1s that an edge has undergone, while "Last T1" shows the time since the last T1.
-
-* "output/%s_wound_cells.txt" contains information on cell shapes. It records the vertices of the cells that were in the first 3 rows around the wound at the time of ablation. The first four columns show: time step, cell id, initial wound distance, current wound distance. The next columns show vertex positions, alternating between x and y coordinates e.g x0, y0, x1, y1... where x0 is the x position of the vertex[0].
-
-* "output/%_wounded_stats.csv" contains wound area and number of junctions over time.
-
-* "output/images/%s_%06d.ps" //post script images of the simulation, recorded every "image_interval" time steps, where %06d is the current timestep.
-
-
 * "shape_%s.csv" records the vertices along the gap
 
 * "t1s_%s.csv" records the location and time of intercalations on the gap
@@ -62,7 +51,7 @@ During running, the simulation records statistics, such as the occurence of inte
 Simulation parameters may be changed in the "parameters.inp" file. Alternatively, values can be overwritten in the simulation file by writing them under the line "read "parameters.inp";" e.g.,
 ```
 read "parameters.inp";
-edge_tension := -0.06;
+gap_tension := 3.14;
 ```
 allowing several simulation files with different parameters in the same folder.
 
@@ -91,9 +80,9 @@ By varying parameters and random seeds, the main results of the simulations can 
 
 ### Contribution guidelines ###
 
-* Email: shiladitya.banerjee@ucl.ac.uk
+* Email: shiladtb@andrew.cmu.edu
 
 ### Who do I talk to? ###
 
 * Michael Staddon (michael.staddon.16@ucl.ac.uk)
-* Shiladitya Banerjee (shiladitya.banerjee@ucl.ac.uk)
+* Shiladitya Banerjee (shiladtb@andrew.cmu.edu)
