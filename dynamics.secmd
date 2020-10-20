@@ -1,0 +1,384 @@
+//-----------------------------------------------------------------//
+                          /*Math Commands*/
+//-----------------------------------------------------------------//
+//-----------------------------------------------------------------//
+/*sign function, gives the sign of a number*/
+function integer sgn(real some_number)
+{
+  local sign_of_some_number;
+  sign_of_some_number := some_number/(abs(some_number));
+
+return sign_of_some_number
+}
+//-----------------------------------------------------------------//
+/* * Evolver does not have a built-in gaussian random generator, this is my own quick implimentation:
+   * Returns member of set with a given mean and standard deviation
+   * mean: mean
+   * standard deviation: std_dev
+   Returns random number in normal distribution centering on 0r.
+   ~95% of numbers returned should fall between -2 and 2
+   http://stackoverflow.com/questions/75677/converting-a-uniform-distribution-to-a-normal-distribution
+*/
+function real randn(real mean, real std_dev)
+{
+  local u1,v1,r1,c1;
+  r1 := -1;
+  while (r1 < 0 OR r1 > 1) do
+  {
+    u1 := 2*random-1;
+    v1 := 2*random-1;
+    r1 := u1*u1 + v1*v1
+  };
+  c1 := sqrt(-2*log(r1)/r1);
+  return u1*c1*std_dev+mean
+}
+
+//-----------------------------------------------------------------//
+//-----------------------------------------------------------------//
+                          /* Initialization */
+//-----------------------------------------------------------------//
+//-----------------------------------------------------------------//
+
+procedure init_one_cell(integer fid)
+{
+    local mycom;
+    mycom := sprintf "unset edges ar%g",fid;
+    exec mycom;
+    mycom := sprintf "set facet[%g].edge method_instance ar%g", fid, fid;
+    exec mycom;
+    mycom := sprintf "unset edges perim%g",fid;
+    exec mycom;
+    mycom := sprintf "set facet[%g].edge method_instance perim%g", fid, fid;
+    exec mycom;
+};
+
+
+init_method_instance :=
+{
+    foreach facet ff do
+    {
+        init_one_cell(ff.id);
+    };
+};
+
+eq_energy :=
+{
+  local nn;
+  conj_grad on;
+  init_method_instance;
+  do {g 1; nn+=1}
+  while (scale > 1e-10 AND nn < 1000);
+  return
+};
+/* set all cell properties according to parameters file */
+
+procedure set_one_cell_properties(integer fid)
+{
+    mycom := sprintf "farea%d.modulus := %f;",fid, kappa / 2;
+    exec mycom;
+    mycom := sprintf "per%d.modulus := %f;",fid, gamma / 2;
+    exec mycom;
+    mycom := sprintf "ten%d.modulus := %f;",fid, - gamma * pzero;
+    exec mycom;
+
+};
+
+
+procedure set_void_properties(integer fid)
+{
+    mycom := sprintf "farea%d.modulus := %f;",fid, 0;
+    exec mycom;
+    mycom := sprintf "per%d.modulus := %f;",fid,0;
+    exec mycom;
+    mycom := sprintf "ten%d.modulus := %f;",fid,0;
+    exec mycom;
+};
+
+set_cell_properties:=
+{
+  local mycom;
+  local length_scale;
+  foreach facet ff where id != newf and not void do
+  {
+      set_one_cell_properties(ff.id);
+  };
+
+  //f newf != -1 then set_void_properties(newf);
+
+    return 0
+};
+
+//-----------------------------------------------------------------//
+                          /* Gap */
+//-----------------------------------------------------------------//
+
+// Get cell distance from wound
+get_gap_distance :=
+{
+    set facet gap_distance 100;
+
+    set facet[newf] gap_distance 0;
+
+    local current_distance;
+
+
+    // Highlight first 3 rows of cells
+    current_distance := 0;
+    while max(facet, gap_distance) == 100 and current_distance < 100 do
+    {
+        // Flood fill the distance
+        foreach facet ff where gap_distance == current_distance do
+        {
+            // Set the distance for cells next to our current range
+            foreach ff.edge ee do
+            {
+                foreach ee.facet ff2 do
+                {
+                    ff2.gap_distance := minimum(ff2.gap_distance, current_distance + 1);
+                };
+            };
+        };
+
+        current_distance += 1;
+    };
+}
+
+
+//-----------------------------------------------------------------//
+                          /* Recording */
+//-----------------------------------------------------------------//
+
+record_wound_shape :=
+{
+    printf "%f", simulation_step >> recname;
+
+    foreach facet[newf].vertex vv do
+    {
+        printf ",%f,%f", vv.x, vv.y >> recname;
+    };
+
+    printf "\n" >> recname;
+};
+
+procedure record_t1_event(integer eid)
+{
+    // Record the cells involved in the T1 on gap
+
+    nearest_point := 1;
+
+    if avg(edge[eid].vertex, y) > (min(facet[newf].vertex, y) + max(facet[newf].vertex, y)) / 2 then
+    {
+        nearest_point := 2;
+    };
+
+    printf "%f,%f,%f,%d\n", simulation_time, avg(edge[eid].vertex, y), avg(edge[eid].vertex, y), nearest_point >> t1name;
+}
+
+
+record_row_counts :=
+{
+
+    printf "%f,%f,%f,%f\n", simulation_time, sum(facet where gap_distance == 1, 1), sum(facet where gap_distance == 2, 1), sum(facet where gap_distance == 3, 1) >> rowcount_file;
+}
+
+
+record_cell_shape :=
+{
+    foreach facet ff where not void do
+    {
+        printf "%f,%d,%d", simulation_time, ff.id, ff.gap_distance >> cell_shape_file;
+
+        cell_area := 0;
+        cx := 0;
+        cy := 0;
+
+        foreach ff.edge ee do
+        {
+            cell_area += 0.5 * (ee.vertex[1].x * ee.vertex[2].y - ee.vertex[1].y * ee.vertex[2].x);
+            cx += (ee.vertex[1].x + ee.vertex[2].x) * (ee.vertex[1].x * ee.vertex[2].y - ee.vertex[1].y * ee.vertex[2].x);
+            cy += (ee.vertex[1].y + ee.vertex[2].y) * (ee.vertex[1].x * ee.vertex[2].y - ee.vertex[1].y * ee.vertex[2].x);
+        };
+
+        cx /= 6 * cell_area;
+        cy /= 6 * cell_area;
+
+
+        // Cell center velocity
+        printf ",%f,%f", (cx - ff.center_x) / output_interval, (cy - ff.center_y) / output_interval >> cell_shape_file;
+
+        ff.center_x := cx;
+        ff.center_y := cy;
+
+        foreach ff.vertex vv do
+        {
+            printf ",%f,%f", vv.x, vv.y >> cell_shape_file;
+        };
+
+        printf "\n" >> cell_shape_file;
+    };
+}
+
+record_tensions :=
+{
+    foreach edge ee do
+    {
+        net_tension := ee.tension;
+
+        foreach ee.facet ff where not void do
+        {
+            net_tension += gamma * (sum(ff.edge, length) - pzero);
+        };
+
+        printf "%f,%f,%f,%f,%f,%f\n", simulation_time, ee.vertex[1].x, ee.vertex[1].y, ee.vertex[2].x, ee.vertex[2].y, net_tension >> tension_file;
+    };
+}
+
+//-----------------------------------------------------------------//
+                          /* Dynamics */
+//-----------------------------------------------------------------//
+
+
+// Flags whether or not an edge should be t1 edge swapped
+function integer should_t1(integer eid)
+{
+    //if edge[eid].last_t1 + t1_time > simulation_step then return 0;
+
+  	// The edge must be below some minimum length
+  	if edge[eid].length > Lmin then return 0;
+
+  	if sum(edge[eid].facet, 1) < 2 then return 0;
+
+    // No T1 back into gap!
+    if sum(edge[eid].vertex[1].facet where void, 1) != 0 and sum(edge[eid].vertex[2].facet where void, 1) == 0 then return 0;
+    if sum(edge[eid].vertex[1].facet where void, 1) == 0 and sum(edge[eid].vertex[2].facet where void, 1) != 0 then return 0;
+
+    //return 1;
+
+  	// If the forcing on the two vertices is reducing the length then we should t1 swap
+
+  	// This is the dot product of the edge direction with the changing in the edge direction
+  	return ((edge[eid].vertex[1].x - edge[eid].vertex[2].x)*(edge[eid].vertex[1].fx_shape - edge[eid].vertex[2].fx_shape) + (edge[eid].vertex[1].y - edge[eid].vertex[2].y)*(edge[eid].vertex[1].fy_shape - edge[eid].vertex[2].fy_shape) < 0);
+}
+
+
+
+
+/* Attempt T1s */
+try_t1 :=
+{
+    local vid1, vid2;
+
+    foreach edge ee do
+    {
+        if should_t1(ee.id)
+        then
+        {
+
+            foreach ee.facet where void do
+            {
+              record_t1_event(ee.id);
+            };
+
+            t1_edgeswap ee;
+
+            // Assign proper energies
+            foreach ee.vertex vv do
+            {
+                foreach vv.facet ff where not void do
+                {
+                    init_one_cell(ff.id);
+                };
+            };
+
+
+
+            ee.last_t1 := simulation_step;
+
+            // Gap T1
+            if (sum(ee.facet where void, 1) == 0) then
+            {
+                // Maintain some tension
+                ee.tension := edge_tension;
+                ee.color := black;
+            }
+            else
+            {
+                ee.tension := gap_tension;
+                ee.color := red;
+            };
+		  };
+	 };
+}
+
+
+//-----------------------------------------------------------------//
+/* Get forces due to shape equilibrium model on each vertex */
+get_shape_forces :=
+{
+    g;
+    foreach vertex vv  do
+    {
+      vv.fx_shape := vv.v_force[1];
+      vv.fy_shape := vv.v_force[2];
+    };
+
+};
+
+
+//-----------------   Simulation steps   ---------------------//
+
+// One step to relax tissues initially
+relax_one :=
+{
+    get_shape_forces;
+    try_t1;
+};
+
+// Full simulation step
+move_one :=
+{
+    if simulation_step % output_interval == 0 then
+    {
+        record_wound_shape;
+        record_row_counts;
+        record_cell_shape;
+        record_tensions;
+    };
+
+    if simulation_step % img_output_interval == 0 then
+    {
+        imgname := sprintf "images/%s_%06d.ps", filename, simulation_step;
+        postscript imgname;
+    };
+
+    get_gap_distance;
+
+
+    get_shape_forces;
+
+    // Add in normal crawling forces
+    foreach facet[newf].edge ee do
+    {
+        // Apply forces normally, a 90 degrees rotation of the tangent
+        foreach ee.facet ff where not void do
+        {
+            foreach ff.vertex vv do
+            {
+                vv.fx_shape += viscosity * crawl_speed *  (ee.vertex[2].y - ee.vertex[1].y) / ee.length / 2;
+                vv.fy_shape += viscosity * crawl_speed *  - (ee.vertex[2].x - ee.vertex[1].x) / ee.length / 2;
+            };
+        };
+
+    };
+
+    try_t1;
+
+    foreach vertex vv where !fixed do
+    {
+        vv.x += dt * vv.fx_shape / viscosity;
+        vv.y += dt * vv.fy_shape / viscosity;
+    };
+
+    simulation_step += 1;
+    simulation_time += dt;
+};

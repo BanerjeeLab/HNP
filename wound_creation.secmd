@@ -1,0 +1,41 @@
+
+//-----------------------------------------------------------------//
+// Create an artificial facet at the wound site, this will allow for proper cell rearrangements and also cells can leave the wound edge or become a part of it. 
+//-----------------------------------------------------------------//
+
+
+
+procedure create_wound_facet(integer initial_eid)
+{	
+	// Create an empty facet staring for edge[eid]
+	
+	
+
+	// Find the next edge along the wound
+	eid := initial_eid;
+	cmd_string := sprintf "newf:=new_facet( %d", eid;
+
+	do
+	{
+		vid := edge[eid].vertex[2].id;
+
+		if sum(edges ee where ee.vertex[1].id == vid and ee.valence == 1 and ee.id != abs(eid), 1) == 1 then
+		{
+			eid := sum(edges ee where ee.vertex[1].id == vid and ee.valence == 1 and ee.id != abs(eid), id);
+		}
+		else
+		{
+			eid := -sum(edges ee where ee.vertex[2].id == vid and ee.valence == 1 and ee.id != abs(eid), id);
+		};
+
+		if (abs(eid) != initial_eid) then {cmd_string := sprintf "%s, %d", cmd_string,  eid};
+
+
+	} while (abs(eid) != initial_eid);
+
+	cmd_string := sprintf "%s )", cmd_string;
+	exec cmd_string;
+
+	facet[newf].void := 1;
+	
+};

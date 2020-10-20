@@ -1,0 +1,29 @@
+// Vertex model parameters
+kappa := 1;
+A0 := 1;
+gamma := 0.04;
+pzero := 3.5;
+edge_tension := 0.00;
+
+gap_tension := 0.116;	// (5 * 2 - 1) * gamma * (3.81 (= average avg_perimeter) - pzero)
+
+// HNP width / time of closure (maintains aspect ratio)
+crawl_speed := 15 / 1000;
+
+// Dynamics parameters
+dt := 1;
+sqdt := sqrt(dt);
+
+viscosity := 5;
+Lmin := 0.1; 		// minimum length threshold for T1 swap
+t1_time := 10;
+t1s_enabled := 1;
+
+
+// Other "under-the-hood" parameters
+random_seed := 1; //seed for random number generation
+output_interval := 10; //how often to output wound size
+img_output_interval := 10;
+simulation_step := 0; // initialize simulation step counter
+//filename := "unnamed";
+newf := -1;
