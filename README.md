@@ -8,7 +8,7 @@ Vertex Model simulations for HNP Gap Closure
 * Michael F Staddon (University College London)
 * Shiladitya Banerjee (Carnegie Mellon University)
 
-#### created at the University College London / Carnegie Mellon ####
+#### created at the University College London / Carnegie Mellon University ####
 
 ### System Requirements ###
 
@@ -72,7 +72,7 @@ allowing several simulation files with different parameters in the same folder.
 |random_seed|int|1|Random seed|
 |output_interval|int|1|Timesteps between wound area recording|
 |cell_output_interval|int|10|Timesteps between cell shape recording|
-|img_output_interval|int|1|Timesteps between image recording|
+|img_output_interval|int|10|Timesteps between image recording|
 
 ### Reproduction instructions ###
 
